@@ -40,10 +40,10 @@ const DEFAULTS = {
   travel: ['基金存入','基金提領']
 };
 const GROUP_NAMES = {
-  daily:'日常開銷',
-  claw:'娃娃機',
-  stock:'股票投資',
-  travel:'夢想旅遊基金'
+  daily: '日常開銷',
+  claw: '娃娃機',
+  stock: '股票投資',
+  travel: '夢想旅遊基金'
 };
 const ICONS = {
   '餐飲':'☕','交通':'↗','購物':'✳','居家':'⌂','帳單':'▤','娛樂':'♡','醫療':'＋','其他支出':'◦','薪資':'↙','副業收入':'✦','其他收入':'✳',
@@ -52,8 +52,8 @@ const ICONS = {
   '基金存入':'✈','基金提領':'↗'
 };
 const COLORS = ['#729a7b','#e7aa79','#95a9c3','#c5a4b2','#d3c184','#8eb8b0','#e18e79','#aaa3c4','#98b4d2','#d8a77d'];
-const $ = selector => document.querySelector(selector);
-const $$ = selector => Array.from(document.querySelectorAll(selector));
+
+const $ = s => document.querySelector(s); const $$ = s => Array.from(document.querySelectorAll(s));
 
 function todayISO(){
   const d = new Date();
@@ -83,16 +83,14 @@ function readEntries(){
   }
 }
 
-let entries = readEntries();
-
 function normalizeMeta(raw = {}){
-  const safeRaw = raw && typeof raw === 'object' ? raw : {};
+  const safe = raw && typeof raw === 'object' ? raw : {};
   return {
-    customClaw: Array.isArray(safeRaw.customClaw) ? safeRaw.customClaw : [],
-    quotes: safeRaw.quotes && typeof safeRaw.quotes === 'object' ? safeRaw.quotes : {},
+    customClaw: Array.isArray(safe.customClaw) ? safe.customClaw : [],
+    quotes: safe.quotes && typeof safe.quotes === 'object' ? safe.quotes : {},
     trip: {
-      name: safeRaw.trip?.name || '夢想旅遊基金',
-      target: Number(safeRaw.trip?.target) || 0
+      name: safe.trip?.name || '夢想旅遊基金',
+      target: Number(safe.trip?.target) || 0
     }
   };
 }
@@ -127,53 +125,41 @@ function readMeta(){
   });
 }
 
+let entries = readEntries();
 let meta = readMeta();
 let activeFilter = 'all';
 let showAll = false;
 let toastTimer = null;
 
-function toast(message){
-  let el = $('#toast');
-  if(!el){
-    el = document.createElement('div');
-    el.id = 'toast';
-    el.style.cssText = 'position:fixed;right:20px;bottom:20px;z-index:9999;background:#1f2937;color:#fff;padding:10px 14px;border-radius:10px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.25);transition:opacity .2s;';
-    document.body.appendChild(el);
-  }
-  el.textContent = message;
-  el.style.opacity = '1';
-  el.style.display = 'block';
+function toast(msg){
+  const el = $('#toast');
+  if(!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    el.style.opacity = '0';
-    setTimeout(() => { el.style.display = 'none'; }, 200);
-  }, 2600);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
 }
 
-function escapeHTML(value = ''){
-  return String(value).replace(/[&<>"']/g, c => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
+function escapeHTML(v = ''){
+  return String(v).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[c]));
 }
 
-function money(amount){
-  return 'NT$' + Math.round(Math.abs(Number(amount) || 0)).toLocaleString('zh-TW');
+function money(n){
+  return 'NT$' + Math.round(Math.abs(Number(n) || 0)).toLocaleString('zh-TW');
 }
 
-function unitMoney(amount){
-  return 'NT$' + Math.abs(Number(amount) || 0).toLocaleString('zh-TW', {
+function unitMoney(n){
+  return 'NT$' + Math.abs(Number(n) || 0).toLocaleString('zh-TW', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }) + ' / 股';
 }
 
-function signedMoney(amount){
-  const n = Number(amount) || 0;
-  return `${n >= 0 ? '+' : '-'}${money(n)}`;
+function signedMoney(n){
+  const val = Number(n) || 0;
+  return `${val >= 0 ? '+' : '-'}${money(val)}`;
 }
 
 function dateLabel(value){
@@ -219,15 +205,6 @@ function save(){
   }
 }
 
-function refreshClawSelectOptions(){
-  const clawSelect = $('#clawDetail');
-  if(!clawSelect) return;
-  const prev = clawSelect.value;
-  const list = [...DEFAULTS.claw, ...meta.customClaw, '＋ 自訂細項'];
-  clawSelect.innerHTML = list.map(c => `<option>${escapeHTML(c)}</option>`).join('');
-  if(prev && list.includes(prev)) clawSelect.value = prev;
-}
-
 async function loadFromCloud(uid){
   isSyncingFromCloud = true;
   try{
@@ -241,7 +218,7 @@ async function loadFromCloud(uid){
       meta = normalizeMeta(data.meta || {});
       localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
       localStorage.setItem(META_KEY, JSON.stringify(meta));
-      refreshClawSelectOptions();
+      refreshCategoryOptions();
       render();
       toast('已載入雲端資料 ☁');
     }else if(entries.length > 0 || meta.trip.target > 0 || meta.customClaw.length > 0){
@@ -261,8 +238,8 @@ async function loadFromCloud(uid){
 }
 
 function updateAuthUI(){
-  const statusEl = $('#authStatus') || $('#userStatus');
-  const loginBtn = $('#googleLoginBtn') || $('#loginBtn');
+  const statusEl = $('#authStatus');
+  const loginBtn = $('#googleLoginBtn');
   const logoutBtn = $('#logoutBtn');
   if(currentUser){
     if(statusEl) statusEl.textContent = `已登入：${currentUser.displayName || currentUser.email || 'Google 使用者'}`;
@@ -275,29 +252,88 @@ function updateAuthUI(){
   }
 }
 
-async function handleGoogleLogin(){
-  try{
-    await signInWithPopup(auth, googleProvider);
-  }catch(err){
-    console.error('Google 登入失敗：', err);
-    toast(`登入失敗：${err?.code || '請稍後再試'}`);
+function refreshCategoryOptions(){
+  const major = $('#majorCategory')?.value || 'daily';
+  const catSel = $('#category');
+  const clawSel = $('#clawDetail');
+
+  if(clawSel){
+    const prev = clawSel.value;
+    const clawList = [...DEFAULTS.claw, ...meta.customClaw, '＋ 自訂細項'];
+    clawSel.innerHTML = clawList.map(c => `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join('');
+    if(prev && clawList.includes(prev)) clawSel.value = prev;
   }
+
+  if(catSel){
+    const list = major === 'claw'
+      ? [...DEFAULTS.claw, ...meta.customClaw, '＋ 自訂細項']
+      : (DEFAULTS[major] || DEFAULTS.daily);
+    catSel.innerHTML = list.map(c => `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join('');
+  }
+
+  toggleFormFields();
 }
 
-async function handleLogout(){
-  try{
-    await signOut(auth);
-    toast('已登出');
-  }catch(err){
-    console.error('登出失敗：', err);
-    toast('登出失敗');
-  }
+function toggleFormFields(){
+  const major = $('#majorCategory')?.value || 'daily';
+  const isFund = major === 'travel';
+  const isStock = major === 'stock';
+  const isClaw = major === 'claw';
+  const catVal = isClaw ? ($('#clawDetail')?.value || $('#category')?.value) : $('#category')?.value;
+  const isCustom = catVal === '＋ 自訂細項';
+
+  $('#normalFields')?.classList.toggle('hidden', isFund);
+  $('#fundFields')?.classList.toggle('hidden', !isFund);
+
+  $('#categoryField')?.classList.toggle('hidden', isClaw);
+  $('#clawDetailField')?.classList.toggle('hidden', !isClaw);
+  $('#customCategoryField')?.classList.toggle('hidden', !isCustom);
+
+  $('#quantityField')?.classList.toggle('hidden', !isStock);
+  $('#priceField')?.classList.toggle('hidden', !isStock);
+  $('#symbolField')?.classList.toggle('hidden', !isStock);
+  $('#manualPriceField')?.classList.toggle('hidden', !isStock);
+}
+
+function openModal(presetMajor = 'daily'){
+  const modal = $('#modal');
+  if(!modal) return;
+  const major = presetMajor === 'fund' ? 'travel' : presetMajor;
+  if($('#majorCategory')) $('#majorCategory').value = major;
+  refreshCategoryOptions();
+
+  if(!$('#date')?.value && $('#date')) $('#date').value = todayISO();
+  if(!$('#fundDate')?.value && $('#fundDate')) $('#fundDate').value = todayISO();
+
+  const titles = {
+    daily: ['新增一筆日常紀錄', '選擇日常收支細項並填入金額。'],
+    claw: ['新增一筆娃娃機紀錄', '記錄機台營收、補貨成本或場租。'],
+    stock: ['新增一筆股票紀錄', '記錄股票買進、賣出或股利。'],
+    travel: ['旅遊基金存入／提領', '為你的夢想旅遊基金增加或提領金額。']
+  };
+  const [t, desc] = titles[major] || ['新增一筆紀錄', '選擇主分類並填入紀錄內容。'];
+  if($('#modalTitle')) $('#modalTitle').textContent = t;
+  const descEl = modal.querySelector('.modal-description');
+  if(descEl) descEl.textContent = desc;
+
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+  setTimeout(() => {
+    if(major === 'travel') $('#fundAmountInput')?.focus();
+    else $('#amount')?.focus();
+  }, 50);
+}
+
+function closeModal(){
+  const modal = $('#modal');
+  if(!modal) return;
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
 }
 
 function monthEntries(){
-  const picker = $('#monthPicker');
-  const month = picker?.value || currentMonthISO();
-  return entries.filter(e => e.date?.startsWith(month));
+  const m = $('#monthPicker')?.value || currentMonthISO();
+  return entries.filter(e => e.date?.startsWith(m));
 }
 
 function portfolio(){
@@ -307,7 +343,7 @@ function portfolio(){
     .sort((a, b) => (a.date || '').localeCompare(b.date || '') || ((a.createdAt || 0) - (b.createdAt || 0)))
     .forEach(e => {
       const symbol = String(e.symbol).toUpperCase().replace(/\.(TW|TWO)$/, '');
-      const g = map[symbol] || { symbol, qty: 0, cost: 0, realized: 0, currency: 'TWD', transactions: 0 };
+      const g = map[symbol] || { symbol, qty: 0, cost: 0, realized: 0, transactions: 0 };
       g.transactions++;
       const qty = Number(e.quantity) || 0;
       const price = Number(e.price) || 0;
@@ -361,170 +397,5 @@ function statFor(items, major){
   return { value, count: selected.length };
 }
 
-function stockDetailRows(symbol){
-  const rows = entries
-    .filter(e => e.major === 'stock' && e.symbol && String(e.symbol).toUpperCase().replace(/\.(TW|TWO)$/, '') === symbol && ['股票買進','股票賣出','股利'].includes(e.category))
-    .sort((a, b) => (a.date || '').localeCompare(b.date || '') || ((a.createdAt || 0) - (b.createdAt || 0)));
-
-  return rows.map(e => {
-    const fee = (Number(e.commission) || 0) + (Number(e.tax) || 0);
-    const trade = ['股票買進','股票賣出'].includes(e.category);
-    const qty = Number(e.quantity) || 0;
-    const price = Number(e.price) || 0;
-    const subtotal = e.category === '股票買進' ? -(Number(e.amount) || qty * price) - fee
-      : e.category === '股票賣出' ? (Number(e.amount) || qty * price) - fee
-      : (Number(e.amount) || 0) - fee;
-    return `<tr><td>${escapeHTML(e.date || '')}</td><td>${escapeHTML(e.category)}</td><td>${trade ? qty.toLocaleString('zh-TW') + ' 股' : '—'}</td><td>${trade ? unitMoney(price) : '—'}</td><td>${money(e.commission)} / ${money(e.tax)}</td><td class="${subtotal >= 0 ? 'pnl-positive' : 'pnl-negative'}">${signedMoney(subtotal)}</td><td><button class="delete-entry detail-delete" data-delete="${escapeHTML(e.id)}" aria-label="刪除這筆${escapeHTML(e.category)}紀錄">刪除</button></td></tr>`;
-  }).join('');
-}
-
-function renderHoldings(holdings){
-  const listEl = $('#holdingsList');
-  if(!listEl) return;
-  listEl.innerHTML = holdings.length ? holdings.map(h => {
-    const details = stockDetailRows(h.symbol);
-    const avg = h.qty ? h.cost / h.qty : 0;
-    return `<div class="holding-card"><div class="holding-row"><div class="holding-ticker"><strong>${escapeHTML(h.symbol)}</strong><small>台幣 · ${h.qty.toLocaleString('zh-TW')} 股</small></div><div><span>平均成本</span><strong>${h.qty ? unitMoney(avg) : '—'}</strong></div><div><span>持倉成本</span><strong>${money(h.displayCost)}</strong></div><div><span>現價</span><strong>${h.price ? unitMoney(h.price) : '—'}</strong><small>${h.updatedAt ? '更新 ' + new Date(h.updatedAt).toLocaleString('zh-TW') : ''}</small></div><div><span>未實現損益</span><strong class="${h.displayPnl >= 0 ? 'pnl-positive' : 'pnl-negative'}">${signedMoney(h.displayPnl)}</strong><small>${h.pct ? h.pct.toFixed(1) + '%' : ''}</small></div></div>${details ? `<table class="detail-table"><thead><tr><th>日期</th><th>類別</th><th>數量</th><th>單價</th><th>手續費/證交稅</th><th>小計</th><th>操作</th></tr></thead><tbody>${details}</tbody></table>` : ''}</div>`;
-  }).join('') : '<p class="empty-hint">目前尚無股票持倉或交易紀錄。</p>';
-}
-
-function renderEntriesList(mItems){
-  const listEl = $('#entriesList');
-  if(!listEl) return;
-  const filtered = activeFilter === 'all' ? mItems : mItems.filter(e => e.major === activeFilter);
-  const sorted = [...filtered].sort((a, b) => (b.date || '').localeCompare(a.date || '') || ((b.createdAt || 0) - (a.createdAt || 0)));
-  const visible = showAll ? sorted : sorted.slice(0, 15);
-  listEl.innerHTML = visible.length ? visible.map(e => {
-    const icon = ICONS[e.category] || '◦';
-    const isInc = incomeEntry(e);
-    return `<div class="entry-item ${ticketClass(e)}"><div class="entry-icon">${escapeHTML(icon)}</div><div class="entry-main"><strong>${escapeHTML(e.title || e.category || '未命名紀錄')}</strong><small>${escapeHTML(dateLabel(e.date))} · ${escapeHTML(GROUP_NAMES[e.major] || e.major)} · ${escapeHTML(e.category || '')}</small></div><div class="entry-amount ${isInc ? 'positive' : ''}">${isInc ? '+' : '-'}${money(e.amount)}</div><button class="delete-entry" data-delete="${escapeHTML(e.id)}" aria-label="刪除紀錄">刪除</button></div>`;
-  }).join('') : '<p class="empty-hint">這個月份還沒有收支紀錄。</p>';
-}
-
-function render(){
-  const mItems = monthEntries();
-  const dailyIncome = mItems.filter(e => e.major === 'daily' && incomeEntry(e)).reduce((s, e) => s + Number(e.amount || 0), 0);
-  const dailyExpense = statFor(mItems, 'daily').value;
-  const dailyBalance = dailyIncome - dailyExpense;
-  const clawStat = statFor(mItems, 'claw');
-  const stockStat = statFor(mItems, 'stock');
-  const travelStat = statFor(mItems, 'travel');
-
-  if($('#monthIncome')) $('#monthIncome').textContent = money(dailyIncome);
-  if($('#monthExpense')) $('#monthExpense').textContent = money(dailyExpense);
-  if($('#monthBalance')) $('#monthBalance').textContent = signedMoney(dailyBalance);
-  if($('#clawNet')) $('#clawNet').textContent = signedMoney(clawStat.value);
-  if($('#stockTotal')) $('#stockTotal').textContent = money(stockStat.value);
-  if($('#travelTotal')) $('#travelTotal').textContent = money(travelStat.value);
-
-  renderHoldings(portfolio());
-  renderEntriesList(mItems);
-  updateAuthUI();
-}
-
-function openModal(major = 'daily'){
-  const modal = $('#entryModal');
-  if(!modal) return;
-  modal.classList.add('open');
-  modal.style.display = 'flex';
-  const dateInput = $('#entryDate');
-  if(dateInput && !dateInput.value) dateInput.value = todayISO();
-  const majorSelect = $('#entryMajor');
-  if(majorSelect && major) majorSelect.value = major;
-}
-
-function closeModal(){
-  const modal = $('#entryModal');
-  if(!modal) return;
-  modal.classList.remove('open');
-  modal.style.display = 'none';
-}
-
-function bindEvents(){
-  const monthPicker = $('#monthPicker');
-  if(monthPicker){
-    if(!monthPicker.value) monthPicker.value = currentMonthISO();
-    monthPicker.addEventListener('change', render);
-  }
-
-  const loginBtn = $('#googleLoginBtn') || $('#loginBtn');
-  if(loginBtn) loginBtn.addEventListener('click', handleGoogleLogin);
-
-  const logoutBtn = $('#logoutBtn');
-  if(logoutBtn) logoutBtn.addEventListener('click', handleLogout);
-
-  $$('[data-open-modal], #addEntryBtn, .open-entry-btn').forEach(btn => {
-    btn.addEventListener('click', () => openModal(btn.dataset.openModal || 'daily'));
-  });
-
-  $$('[data-close-modal], #closeModalBtn, .modal-close').forEach(btn => {
-    btn.addEventListener('click', closeModal);
-  });
-
-  const entryForm = $('#entryForm');
-  if(entryForm){
-    entryForm.addEventListener('submit', e => {
-      e.preventDefault();
-      const major = $('#entryMajor')?.value || 'daily';
-      const category = $('#entryCategory')?.value || $('#clawDetail')?.value || '其他支出';
-      const title = ($('#entryTitle')?.value || '').trim();
-      const amount = Number($('#entryAmount')?.value || 0);
-      const date = $('#entryDate')?.value || todayISO();
-      const type = $('#entryType')?.value || 'expense';
-      if(!amount || amount <= 0){
-        toast('請輸入大於 0 的金額');
-        return;
-      }
-      entries.push({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        major,
-        category,
-        title: title || category,
-        amount,
-        type,
-        date,
-        createdAt: Date.now()
-      });
-      save();
-      render();
-      entryForm.reset();
-      if($('#entryDate')) $('#entryDate').value = todayISO();
-      closeModal();
-      toast('已新增紀錄');
-    });
-  }
-
-  document.addEventListener('click', e => {
-    const delBtn = e.target.closest('[data-delete]');
-    if(delBtn){
-      const id = delBtn.dataset.delete;
-      entries = entries.filter(item => item.id !== id);
-      save();
-      render();
-      toast('已刪除紀錄');
-      return;
-    }
-    const filterBtn = e.target.closest('[data-filter]');
-    if(filterBtn){
-      activeFilter = filterBtn.dataset.filter || 'all';
-      renderEntriesList(monthEntries());
-    }
-  });
-}
-
-onAuthStateChanged(auth, async user => {
-  currentUser = user;
-  updateAuthUI();
-  if(user){
-    await loadFromCloud(user.uid);
-  }else{
-    entries = readEntries();
-    meta = readMeta();
-    refreshClawSelectOptions();
-    render();
-  }
-});
-
-refreshClawSelectOptions();
-bindEvents();
-render();
+function renderBreakdown(mItems){
+  const
